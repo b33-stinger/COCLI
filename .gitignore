@@ -1,0 +1,7 @@
+# Automatically generated
+downloads/
+.history
+
+# Will be added later
+data/config.json
+data/config.py
