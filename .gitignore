@@ -1,7 +1,9 @@
+data/*.old
+
 # Automatically generated
 downloads/
 .history
 
-# Will be added later
+# Will be next update
 data/config.json
 data/config.py

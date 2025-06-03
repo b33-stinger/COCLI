@@ -1,4 +1,4 @@
-## crackmes.one CLI 0.1.0-alpha
+## crackmes.one CLI 0.2.0-alpha
 
 a CLI tool for crackmes.one, login / download and search for crackmes
 
@@ -23,9 +23,22 @@ yay -S python-requests --needed
 #### TODO
 - [ ] config manager
 - [ ] extract with command
-- [ ] logout
-- [ ] better commands descriptions
+- [x] logout
+- [x] better commands descriptions
 - [ ] sys arguments
 - [ ] add pathlib for path sanitization
 - [ ] better help
 - [ ] Rust version
+
+
+#### Changelog
+```
+0.2.0-alpha
+[+] 'download all' command
+[+] more OOP based code
+[+] Logout command
+[+] better commands descriptions
+
+0.1.0-alpha
+Basic functionallity
+```
