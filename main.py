@@ -24,7 +24,7 @@ class Helper():
         parser.add_argument('-s', '--search', type=str, nargs='+', help='search for crackmes name=Crackme-Name author=Crackme-author difficulty_max=Max-difficulty\
              difficulty_min=Min-difficulty quality_max=Max-quality quality_min=Min-quality')
         parser.add_argument('-l', '--latest', type=str, nargs='+', help='get the latest crackmes page=Page all=(is flag)')
-        parser.add_argument('-i', '--history', type=str, nargs='+', help='manager your history ignore=Command,Command2 unignore=Command,Command2 nuke=(is flag)')
+        parser.add_argument('-i', '--history', type=str, nargs='+', help='manage your history ignore=Command,Command2 unignore=Command,Command2 nuke=(is flag)')
         parser.add_argument('-c', '--continue', action='store_true', help='spawn shell after finishing')
 
         return parser.parse_args()
