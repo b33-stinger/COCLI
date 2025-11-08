@@ -1,0 +1,13 @@
+{
+    "host": "https://crackmes.one/",
+    "crackme_base": "https://crackmes.one/crackme/",
+    "search": "https://crackmes.one/search",
+    "login": "https://crackmes.one/login",
+    "logout": "https://crackmes.one/logout",
+    "latest_base": "https://crackmes.one/lasts/",
+    "upload": "https://crackmes.one/upload/crackme",
+    "history_ignore": [
+        "login"
+    ],
+    "gosess": ""
+}
