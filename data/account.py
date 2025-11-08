@@ -1,37 +1,45 @@
-#!/bin/env python3
 class Acc():
 
-    def __init__(self, crackmes = None, requests_session = None):
+    def __init__(self, crackmes = None, requests_session = None, config_manager = None):
         self.crackmes = crackmes                 # Set ASAP | crackmes instance
         self.requests_session = requests_session # Set ASAP | requests instance
+        self.config = config_manager             # Set ASAP | config instance
         self.logged_in = False
+        self.username = None
     
-    def login(self, username: str, password: str) -> int:
+    def login(self, use_cookie: bool, username: str, password: str, save_cookie: bool) -> int:
         '''
         Login -> username + password -> 0 Something went Wrong, 1 Ok
         '''
         print('Logging in...', end=' ', flush=True)
-        token = self.crackmes.get_token('https://crackmes.one/login')
+        if use_cookie:
+            self.requests_session.cookies.update({'gosess': self.config.get('gosess')})
+            req = self.requests_session.get(self.config.get('host'))
+
+        token = self.crackmes.get_token(self.config.get('login'))
         payload = {
             'name': username,
             'password': password,
             'token': token
         }
-        req = self.requests_session.post('https://crackmes.one/login', data=payload)
+        req = self.requests_session.post(self.config.get('login'), data=payload)
+        status = 0
         if 'Password is incorrect' in req.text and self.check_login():
             print('Username or Password is wrong')
-            return 0
+            status = 0
         if 'Login successful!' in req.text:
             print('[ OK ]')
-            return 1
-        return 0
+            status = 1
+        if save_cookie and status == 1:
+            self.config.update('gosess', req.cookies['gosess'])
+        return status
     
     def logout(self) -> int:
         '''
         Logout -> 1 logged out, 0 something went wrong
         '''
         print('Logging out...', end=' ', flush=True)
-        req = self.requests_session.get('https://crackmes.one/logout')
+        req = self.requests_session.get(self.config.get('logout'))
         if 'Goodbye!' in req.text or not self.check_login():
             print('[ OK ]')
             return 1
@@ -40,10 +48,18 @@ class Acc():
     
     def check_login(self) -> int:
         '''
-        Will be used in later updates\n
         Check if you're really logged in
         '''
-        req = self.requests_session.get('https://crackmes.one/upload/crackme')
+        req = self.requests_session.get(self.config.get('upload'))
         if 'Please provide details in the infos section. You can upload just the executable or an archive containing needed resources.' in req.text:
             return 1
         return 0
+
+    def get_username(self) -> str:
+        '''
+        Get your username
+        '''
+        if not self.logged_in:
+            print('[ Please login first ]')
+            return ''
+        req = requests.get(self.config['host'])

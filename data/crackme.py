@@ -11,6 +11,7 @@ COLOR_BRIGHTNESS = {
     178: 180, 166: 140, 88: 60
 }
 
+# Functions
 def format_bytes(size: int) -> str:
     '''
     format bytes to human readable
@@ -40,22 +41,21 @@ def get_biggest(x: int, y: int) -> int:
     '''
     return x if x > y else y
 
-
+# Classes
 class CrackmeManager:
-    def __init__(self, requests_session):
-        self.args = None
-        self.host = 'https://crackmes.one/'
+    def __init__(self, requests_session, config_manager):
+        self.config = config_manager
         self.requests = requests_session
-        self.last_search = []
+        self.last_search = {}
         self.zip_pw = ['crackmes.one', 'crackmes.de']
 
     def _extract_hash(self, download_url: str) -> str:
         '''
-        get the crackme\'s hash by it\'s url
+        get the crackme's hash by it's url
         '''
         return urlparse(download_url).path.split('/')[-1]
 
-    def get_token(self, url='https://crackmes.one/') -> str:
+    def get_token(self, url = 'https://crackmes.one/') -> str:
         '''
         Get the CSRF Token of page X
         '''
@@ -81,16 +81,16 @@ class CrackmeManager:
 
             crackme_info = {
                 'name': name,
-                'url': urljoin(self.host, href_0),
-                'download_url': urljoin(self.host, f'/static/crackme/{file_hash}.zip'),
+                'url': urljoin(self.config.get('host'), href_0),
+                'download_url': urljoin(self.config.get('host'), f'/static/crackme/{file_hash}.zip'),
                 'filename': f'{file_hash}.zip',
                 'filehash': file_hash,
                 'user': username,
                 'user_url': tds[1].find('a')['href'],
                 'language': tds[2].get_text(strip=True),
                 'arch': tds[3].get_text(strip=True),
-                'difficulty': float(tds[4].get_text(strip=True)),
-                'quality': float(tds[5].get_text(strip=True)),
+                'difficulty': max(1.0, min(float(tds[4].get_text(strip=True)), 6.0)), # older crackmes might have > 6 rating
+                'quality': max(1.0, min(float(tds[5].get_text(strip=True)), 6.0)), # older crackmes might have > 6 rating
                 'os': tds[6].get_text(strip=True),
                 'date': tds[7].get_text(strip=True),
                 'solutions': int(tds[8].get_text(strip=True)),
@@ -100,16 +100,24 @@ class CrackmeManager:
             longest_name = get_biggest(len(name), longest_name)
 
             crackmes['found'].append(Crackme(crackme_info, self))
-        self.last_search = crackmes
         crackmes['longest_user'] = longest_user
         crackmes['longest_name'] = longest_name
+        return crackmes
+
+    def get_latest(self, page: int = 1) -> dict:
+        '''
+        Get the latest crackmes from Page page
+        '''
+        req = self.requests.get(urljoin(self.config.get('latest_base'),  str(page)))
+        crackmes = self._parse_search(req.text)
+        self.last_search = crackmes
         return crackmes
 
     def search(self, name: str = '', author: str = '', difficulty_min: int = 1, difficulty_max: int = 6, quality_min: int = 1, quality_max: int = 6, lang: str = None, arch: str = None, platform: str = None) -> dict:
         '''
         Search for a crackme
         '''
-        token = self.get_token(self.host + 'search')
+        token = self.get_token(self.config.get('host') + 'search')
         payload = {
             'name': name,
             'author': author,
@@ -125,8 +133,10 @@ class CrackmeManager:
             payload['arch'] = arch
         if platform:
             payload['platform'] = platform
-        req = self.requests.post(self.host + 'search', data=payload)
-        return self._parse_search(req.text)
+        req = self.requests.post(self.config.get('search'), data=payload)
+        crackmes = self._parse_search(req.text)
+        self.last_search = crackmes
+        return crackmes
     
     def _parse_info(self, raw_html: str, url: str) -> dict:
         '''
@@ -165,9 +175,9 @@ class CrackmeManager:
         details = [extract_text(div.find('p'), remove_a=(i == 4)) for i, div in enumerate(filtered_divs)]
 
         user_div = divs[0]
-        user_url = urljoin('https://crackmes.one', user_div.find('a')['href'])
+        user_url = urljoin(self.config.get('host'), user_div.find('a')['href'])
         download_div = divs[4]
-        download_url = urljoin('https://crackmes.one', download_div.find('a')['href'])
+        download_url = urljoin(self.config.get('host'), download_div.find('a')['href'])
 
         filehash = self._extract_hash(download_url)
         info = {
@@ -212,8 +222,10 @@ class CrackmeManager:
                     return self.extract_zip(os.path.join(output_folder, names[0]), output_folder, passwords, True)
             except RuntimeError:
                 continue
+            except Exception as e:
+                print(f'[ ERROR ] {e}')
         print('Failed to extract with provided passwords.')
-        return 1
+        return 0
 
     def download(self, download_url: str, dest_folder: str = 'downloads', name: str = '', filename: str = '', chunk_size: int = 8192, auto_extract: bool = True) -> int:
         '''
@@ -241,8 +253,7 @@ class CrackmeManager:
             self.extract_zip(zip_path, dest_folder, self.zip_pw)
         return 1
 
-
-class Crackme:
+class Crackme():
 
     def __init__(self, info: dict, crackme_manager):
         self.name = info.get('name')

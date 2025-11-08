@@ -1,78 +1,14 @@
-#!/bin/env python3
+#!/usr/bin/env python3
 from requests import Session
 from urllib.parse import urljoin
 from shutil import get_terminal_size
-#from argparse import ArgumentParser
+from argparse import ArgumentParser
 
 from data.terminal import Terminal
-from data.crackme import CrackmeManager, rating_color
+from data.crackme import CrackmeManager, rating_color, get_biggest
 from data.account import Acc
-
-
-# Globals
-__version__ = '0.2.0-alpha'
-requests = Session()
-requests.headers = {
-    'User-Agent': 'COCLI/5.0 (X11; Python3 x86_64; rv:0.2.0) COCLI/0.2.0',
-    'Content-Type': 'application/x-www-form-urlencoded'
-}
-COMMANDS = [
-    {
-        'name': 'download',
-        'desc': 'Download crackme',
-        'args': {
-            'all': {'type': 'flag', 'desc': 'Download all crackmes from last search'},
-            'url': {'type': 'value', 'desc': 'crackme download URL'},
-            'hash': {'type': 'value', 'desc': 'crackme Hash'},
-            'search_id': {'type': 'value', 'desc': 'ID from last search'},
-            'download_folder': {'type': 'value', 'desc': 'Folder to save downloads'},
-            'auto_extract': {'type': 'flag', 'desc': 'Automatically extract archives'},
-            'extract_folder': {'type': 'value', 'desc': 'Folder to extract files into'},
-        },
-    },
-    {
-        'name': 'search',
-        'desc': 'search for crackmes',
-        'args': {
-            'name': {'type': 'value', 'desc': 'Name of the crackme'},
-            'author': {'type': 'value', 'desc': 'Author of the crackme'},
-            'difficulty_min': {'type': 'value', 'desc': 'Minimum difficulty'},
-            'difficulty_max': {'type': 'value', 'desc': 'Maximum difficulty'},
-            'quality_min': {'type': 'value', 'desc': 'Minimum quality'},
-            'quality_max': {'type': 'value', 'desc': 'Maximum quality'},
-        },
-    },
-    {
-        'name': 'login',
-        'desc': 'Log into your account',
-        'args': {
-            'username': {'type': 'value', 'desc': 'Your username'},
-            'password': {'type': 'value', 'desc': 'Your password'},
-        },
-    },
-    {
-        'name': 'logout',
-        'desc': 'Logout of your account',
-        'args': {}
-    },
-    {
-        'name': 'help',
-        'desc': 'Show all commands',
-        'args': {}
-    },
-    {
-        'name': 'exit',
-        'desc': 'Exit the program',
-        'args': {},
-    },
-]
-
-# Don't save said command in history
-history_ignore = ['login']
-
-acc = Acc(requests_session=requests)
-crackmes = CrackmeManager(requests)
-acc.crackmes = crackmes
+from data.config import ConfigManager
+from data.commands import COMMANDS
 
 
 # Classes
@@ -80,27 +16,32 @@ class Helper():
     '''
     don't use as instance
     '''
-    # Argument's will be implemented next update
-    #def init_arguments() -> any:
-    #    parser = ArgumentParser(description=f'COCLI {__version__}')
-    #    return parser.parse_args()
+    def init_arguments() -> any:
+        parser = ArgumentParser(description=f'COCLI {__version__}')
 
-    def generate_terminal_prompt(text: str = "[ USERNAME_PAYLOAD ] # COCLI >", username: str = "Anon") -> str:
+        parser.add_argument('-d', '--download', type=str, nargs='+', help='download crackme\n hash=HASH\n url=Download-URL')
+        parser.add_argument('-a', '--auto-extract', action='store_true', help='automatically extract downloaded crackmes')
+        parser.add_argument('-s', '--search', type=str, nargs='+', help='search for crackmes name=Crackme-Name author=Crackme-author difficulty_max=Max-difficulty\
+             difficulty_min=Min-difficulty quality_max=Max-quality quality_min=Min-quality')
+        parser.add_argument('-l', '--latest', type=str, nargs='+', help='get the latest crackmes page=Page all=(is flag)')
+        parser.add_argument('-i', '--history', type=str, nargs='+', help='manager your history ignore=Command,Command2 unignore=Command,Command2 nuke=(is flag)')
+        parser.add_argument('-c', '--continue', action='store_true', help='spawn shell after finishing')
+
+        return parser.parse_args()
+
+    def generate_terminal_prompt(text: str = '[ USERNAME_PAYLOAD ] # COCLI >', username: str = 'Anon') -> str:
         '''
         Generate the prompt for the terminal
         '''
-        return text.replace("USERNAME_PAYLOAD", username)
+        return text.replace('USERNAME_PAYLOAD', username)
 
     def _add_centered_text(text: str, payload: str) -> str:
         '''
         inject playoad (str) in the middle of text
         '''
-        text_list = list(text)
-        payload_list = list(payload)
-        payload_start = int((len(text) / 2 ) - 2)
-        payload_end = int(((len(text) / 2) - 1) + len(payload))
-        text_list[payload_start:payload_end] = payload_list
-        return ''.join(text_list)
+        mid = len(text) // 2
+        return text[:mid] + payload + text[mid:]
+
 
     def download(search_id: int = None, download_url: str = None, challenge_hash: str = None, auto_extract: bool = True) -> int:
         '''
@@ -108,11 +49,13 @@ class Helper():
         '''
         if search_id != None:
             return crackmes.last_search['found'][int(search_id)].download(auto_extract=auto_extract)
-        elif url != None:
-            crackme_page = urljoin('https://crackmes.one/crackme/', crackmes._extract_hash(download_url))
+        elif download_url != None:
+            crackme_page = urljoin(config.get('crackme_base'), crackmes._extract_hash(download_url))
         elif challenge_hash != None:
-            crackme_page = urljoin('https://crackmes.one/crackme/', challenge_hash)
-        
+            crackme_page = urljoin(config.get('crackme_base'), challenge_hash)
+        else:
+            print('atleast 1 option is required')
+            return 0
         crackme_instance = crackmes.get_info(crackme_page)
         download_status = crackme_instance.download()
 
@@ -134,14 +77,14 @@ class Helper():
         # TODO: Emojis are not parsed as 1 character, duh, but messes up spacing
         return color + f'#{crackme_id}{space(3 - len(str(crackme_id)))} {user}{space(longest_user+1 - len(user))}-> {name}{space(longest_name - len(name))} [{dif_color}{''.join(dif)}\033[0m] [{qul_color}{''.join(qul)}\033[0m]{color} {filehash}'.ljust(width) + '\033[0m'
     
-    def login(username: str, password: str) -> int:
+    def login(use_cookie: bool, username: str, password: str, save: bool = False) -> int:
         '''
         Login to your crackmes account
         '''
         if acc.logged_in:
             print('You\'re already logged in. use \'logout\' to logout first')
             return 1
-        
+
         if not username:
             print('No username given')
             return 0
@@ -150,7 +93,7 @@ class Helper():
             print('No password given')
             return 0
         
-        logged_in = acc.login(username, password)
+        logged_in = acc.login(use_cookie, username, password, save)
         acc.logged_in = logged_in
         if logged_in:
             term.prompt = Helper.generate_terminal_prompt(username=username)
@@ -168,14 +111,132 @@ class Helper():
         return acc.logout()
 
 
+# Globals
+__version__ = '0.3.0-alpha'
+requests = Session()
+requests.headers = {
+    'User-Agent': f'COCLI/5.0 (X11; Python3 x86_64; rv:0.3.0) COCLI/{__version__}',
+    'Content-Type': 'application/x-www-form-urlencoded'
+}
+
+config = ConfigManager('data/config.json')
+acc = Acc(requests_session=requests, config_manager=config)
+crackmes = CrackmeManager(requests, config)
+acc.crackmes = crackmes
+
+# Don't save said command in history
+history_ignore = config.get('history_ignore', [])
+
+width = get_terminal_size().columns
+term = Terminal(commands=COMMANDS, prompt=Helper.generate_terminal_prompt(), history_ignore = history_ignore)
+
+
 def space(size: int) -> str: return ' ' * size
 
+def handle_command(cmd: str, args: dict) -> int:
+    match cmd:
+        case 'exit':
+            print('Goodbye!')
+            exit()
 
-if __name__ == '__main__':
+        case 'download':
+            url = args.get('url', '')
+            challenge_hash = args.get('hash', '')
+            search_id = args.get('search_id', '')
+            auto_extract = args.get('auto_extract', True)
+            auto_extract = str(auto_extract).lower() in ['1', 'true', 'yes']
+            if 'all' in args:
+                for i in range(len(crackmes.last_search['found'])):
+                    Helper.download(i, None, None)
+                return
+            Helper.download(search_id, url, challenge_hash)
+            
+        case 'search':
+            found = crackmes.search(
+                args.get('name', ''),
+                args.get('author', ''),
+                difficulty_min=int(args.get('difficulty_min', 1)),
+                difficulty_max=int(args.get('difficulty_max', 6)),
+                quality_min=int(args.get('quality_min', 1)),
+                quality_max=int(args.get('quality_max', 6))
+            )
+            i = 0
+            print(f'{space(5 - len(str(i)))} Username{space(found['longest_user']+3 - len('Username'))} Name{space(found['longest_name']+1 - len('Name'))} Difficulty{space(12)}Quality{space(14)}Hash'.ljust(width))
+            for x in found['found']:
+                print(Helper.crackme_display(i, x.user, x.name, x.difficulty, x.quality, x.filehash, found['longest_user'], found['longest_name']))
+                i += 1
+
+        case 'latest':
+            get_all = args.get('all', False)
+            page = int(args.get('page', 1))
+            found = {
+                'longest_user': 0,
+                'longest_name': 0,
+                'found': []
+            }
+            if get_all:
+                cur = page
+                while True:
+                    print(f'Getting page {cur}', end='\r')
+                    tmp = crackmes.get_latest(cur)
+                    if tmp['found'] == []:
+                        break
+                    found.setdefault('found', []).extend(tmp['found'])
+                    found['longest_name'] = get_biggest(found['longest_name'], tmp['longest_name'])
+                    found['longest_user'] = get_biggest(found['longest_user'], tmp['longest_user'])
+                    cur += 1
+                crackmes.last_search = found
+            else:
+                found = crackmes.get_latest(page)
+            i = 0
+            print(f'{space(5 - len(str(i)))} Username{space(found['longest_user']+3 - len('Username'))} Name{space(found['longest_name']+1 - len('Name'))} Difficulty{space(12)}Quality{space(14)}Hash'.ljust(width))
+            for x in found['found']:
+                print(Helper.crackme_display(i, x.user, x.name, x.difficulty, x.quality, x.filehash, found['longest_user'], found['longest_name']))
+                i += 1
+
+        case 'login':
+            use_cookie = args.get('use_cookie')
+            name = args.get('username')
+            pw = args.get('password')
+            save = args.get('save_session')
+            #save = 
+            Helper.login(use_cookie, name, pw, save)
+
+        case 'logout':
+            Helper.logout()
+
+        case 'history':
+            nuke = args.get('nuke', True)
+            nuke = str(nuke).lower() in ['1', 'true', 'yes']
+            if nuke:
+                term.history = []
+                term.history_file(3, '')
+                
+            unignore = args.get('unignore', '')
+            if unignore:
+                term.history_ignore = [x for x in term.history_ignore if x not in unignore]
+                    
+            ignore = args.get('ignore', '')
+            if ignore:
+                term.history_ignore.extend(ignore.split(','))
+                
+            config.update('history_ignore', term.history_ignore)
+            config.save_config()
+
+        case 'help':
+            print('Commands:', ', '.join(x['name'] for x in COMMANDS))
+            print('Use arguments as key=value, e.g. search author=John name=CrackMe')
+
+        case '':
+            pass
+
+        case _:
+            print(f'Unknown command: {cmd}')
+    return 1
+
+def main() -> int:
     print(f'Welcome to\n\033[31mC\033[mrackmes\n\033[31mO\033[0mne\n\033[31mC\033[0mommand\n\033[31mL\033[0mine\n\033[31mI\033[0mnterface\n{__version__}')
     print('type help for help')
-    width = get_terminal_size().columns
-    term = Terminal(commands=COMMANDS, prompt=Helper.generate_terminal_prompt(), history_ignore = history_ignore)
 
     while True:
         line = term.run()
@@ -185,52 +246,24 @@ if __name__ == '__main__':
         # If you comment this out the line with the command will be cleared, needs fix maybe
         print('\n')
 
-        match cmd:
-            case 'exit':
-                print('Goodbye!')
-                break
+        handle_command(cmd, args)
 
-            case 'download':
-                url = args.get('url')
-                challenge_hash = args.get('hash')
-                search_id = args.get('search_id')
-                auto_extract = args.get('auto_extract', True)
-                auto_extract = str(auto_extract).lower() in ['1', 'true', 'yes']
-                if 'all' in args:
-                    for i in range(len(crackmes.last_search['found'])):
-                        Helper.download(i, None, None)
-                    continue
-                Helper.download(search_id, url, challenge_hash)
-                
-            case 'search':
-                found = crackmes.search(
-                    args.get('name', ''),
-                    args.get('author', ''),
-                    difficulty_min=int(args.get('difficulty_min', 1)),
-                    difficulty_max=int(args.get('difficulty_max', 6)),
-                    quality_min=int(args.get('quality_min', 1)),
-                    quality_max=int(args.get('quality_max', 6))
-                )
-                i = 0
-                print(f'{space(5 - len(str(i)))} Username{space(found['longest_user']+3 - len('Username'))} Name{space(found['longest_name']+1 - len('Name'))} Difficulty{space(8)}Quality{space(10)}Hash'.ljust(width))
-                for x in found['found']:
-                    print(Helper.crackme_display(i, x.user, x.name, x.difficulty, x.quality, x.filehash, found['longest_user'], found['longest_name']))
-                    i += 1
+    return 1
 
-            case 'login':
-                name = args.get('username')
-                pw = args.get('password')
-                Helper.login(name, pw)
+if __name__ == '__main__':
+    args_raw = vars(Helper.init_arguments())
+    args = {
+        k: (
+            {item.split('=', 1)[0]: item.split('=', 1)[1] if '=' in item else True for item in v} if isinstance(v, list)
+            else {item.split('=', 1)[0]: item.split('=', 1)[1] for item in v.split()} if isinstance(v, str) and '=' in v
+            else v
+        )
+        for k, v in args_raw.items()
+    }
+    for command, arguments in args.items():
+        if command in ['continue', 'auto_extract', 'nuke'] or arguments == None:
+            continue
+        handle_command(command, arguments)
 
-            case 'logout':
-                Helper.logout()
-
-            case 'help':
-                print('Commands:', ', '.join(x['name'] for x in COMMANDS))
-                print('Use arguments as key=value, e.g. search author=John name=CrackMe')
-
-            case '':
-                pass
-
-            case _:
-                print(f'Unknown command: {cmd}')
+    if args['continue']:
+        main()
