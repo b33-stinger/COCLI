@@ -251,6 +251,7 @@ def main() -> int:
     return 1
 
 if __name__ == '__main__':
+    shell = True
     args_raw = vars(Helper.init_arguments())
     args = {
         k: (
@@ -263,7 +264,8 @@ if __name__ == '__main__':
     for command, arguments in args.items():
         if command in ['continue', 'auto_extract', 'nuke'] or arguments == None:
             continue
+        shell = False
         handle_command(command, arguments)
 
-    if args['continue']:
+    if args['continue'] or shell:
         main()
