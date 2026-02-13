@@ -13,16 +13,16 @@ class Acc():
         '''
         print('Logging in...', end=' ', flush=True)
         if use_cookie:
-            self.requests_session.cookies.update({'gosess': self.config.get('gosess')})
+            self.requests_session.cookies.update({'crackmesone': self.config.get('crackmesone')})
             req = self.requests_session.get(self.config.get('host'))
 
-        token = self.crackmes.get_token(self.config.get('login'))
+        csrf_token = self.crackmes.get_csrf_token(self.config.get('login'))
         payload = {
             'name': username,
             'password': password,
-            'token': token
+            'csrf_token': csrf_token
         }
-        req = self.requests_session.post(self.config.get('login'), data=payload)
+        req = self.requests_session.post(self.config.get('login'), data=payload, headers=self.requests_session.headers.update(self.config.get('login_headers')))
         status = 0
         if 'Password is incorrect' in req.text and self.check_login():
             print('Username or Password is wrong')
@@ -31,7 +31,7 @@ class Acc():
             print('[ OK ]')
             status = 1
         if save_cookie and status == 1:
-            self.config.update('gosess', req.cookies['gosess'])
+            self.config.update('crackmesone', req.cookies['crackmesone'])
         return status
     
     def logout(self) -> int:

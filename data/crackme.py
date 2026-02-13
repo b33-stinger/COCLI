@@ -3,6 +3,7 @@ from bs4 import BeautifulSoup
 from zipfile import ZipFile
 from urllib.parse import urljoin, urlparse
 import os
+from re import findall as re_findall
 
 # Constants
 COLOR_SCALE = [120, 154, 190, 178, 166, 88]
@@ -55,12 +56,12 @@ class CrackmeManager:
         '''
         return urlparse(download_url).path.split('/')[-1]
 
-    def get_token(self, url = 'https://crackmes.one/') -> str:
+    def get_csrf_token(self, url = 'https://crackmes.one/') -> str:
         '''
-        Get the CSRF Token of page X
+        Get the CSRF csrf_token of page X
         '''
         req = self.requests.get(url)
-        return BeautifulSoup(req.text, 'html.parser').find('input', id='token').get('value', '')
+        return BeautifulSoup(req.text, 'html.parser').find('input', attrs={"name": "csrf_token"}).get('value', '')
     
     def _parse_search(self, raw_html: str) -> list:
         '''
@@ -92,9 +93,11 @@ class CrackmeManager:
                 'difficulty': max(1.0, min(float(tds[4].get_text(strip=True)), 6.0)), # older crackmes might have > 6 rating
                 'quality': max(1.0, min(float(tds[5].get_text(strip=True)), 6.0)), # older crackmes might have > 6 rating
                 'os': tds[6].get_text(strip=True),
-                'date': tds[7].get_text(strip=True),
-                'solutions': int(tds[8].get_text(strip=True)),
-                'comments': int(tds[9].get_text(strip=True)),
+                'size': tds[7].get_text(strip=True),
+                'date': tds[8].get_text(strip=True),
+                'downloads': re_findall(r'-?\d+\.?\d*', tds[9].get_text(strip=True))[0],
+                'solutions': int(tds[10].get_text(strip=True)),
+                'comments': int(tds[11].get_text(strip=True)),
             }
             longest_user = get_biggest(len(username), longest_user)
             longest_name = get_biggest(len(name), longest_name)
@@ -117,7 +120,7 @@ class CrackmeManager:
         '''
         Search for a crackme
         '''
-        token = self.get_token(self.config.get('host') + 'search')
+        csrf_token = self.get_csrf_token(self.config.get('host') + 'search')
         payload = {
             'name': name,
             'author': author,
@@ -125,7 +128,18 @@ class CrackmeManager:
             'difficulty-max': difficulty_max,
             'quality-min': quality_min,
             'quality-max': quality_max,
-            'token': token
+            'downloads-min': 0,
+            'downloads-max': '',
+            'solutions-min': 0,
+            'solutions-max': '',
+            'comments-min': 0,
+            'comments-max': '',
+            'size-min': '',
+            'size-min-unit': 'KB',
+            'size-max': '',
+            'size-max-unit': 'MB',
+            'sort_by': 'downloads',
+            'csrf_token': csrf_token
         }
         if lang:
             payload['lang'] = lang
@@ -133,7 +147,7 @@ class CrackmeManager:
             payload['arch'] = arch
         if platform:
             payload['platform'] = platform
-        req = self.requests.post(self.config.get('search'), data=payload)
+        req = self.requests.post(self.config.get('search'), data=payload, headers=self.requests.headers.update(self.config.get('search_headers')))
         crackmes = self._parse_search(req.text)
         self.last_search = crackmes
         return crackmes
@@ -193,7 +207,11 @@ class CrackmeManager:
             'os': details[3],
             'arch': details[6],
             'difficulty': details[4],
-            'quality': details[5]
+            'quality': details[5],
+            'downloads': re_findall(r'-?\d+\.?\d*', details[6])[0],
+            'size': details[7],
+            'solutions': details[8],
+            'comments': details[9]
         }
         return Crackme(info, self)
     
@@ -268,7 +286,9 @@ class Crackme():
         self.difficulty = float(info.get('difficulty'))
         self.quality = float(info.get('quality'))
         self.os = info.get('os')
+        self.size = info.get('size')
         self.date = info.get('date')
+        self.downloads = info.get('downloads')
         self.solutions = info.get('solutions')
         self.comments = info.get('comments')
         self.manager = crackme_manager

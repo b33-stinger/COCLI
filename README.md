@@ -34,6 +34,11 @@ yay -S python-requests --needed
 
 #### Changelog
 ```
+0.4.0-alpha
+[+] get Download count
+[+] get File size (before downloading)
+[+] handle new website layout/api
+
 0.3.0-alpha
 [+] get latest crackmes
 [+] history command

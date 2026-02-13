@@ -61,7 +61,7 @@ class Helper():
 
         return download_status
     
-    def crackme_display(crackme_id: int, user: str, name: str, difficulty: float, quality: float, filehash: str, longest_user: int, longest_name: int) -> str:
+    def crackme_display(crackme_id: int, user: str, name: str, difficulty: float, quality: float, downloads: int, filehash: str, longest_user: int, longest_name: int) -> str:
         '''
         Generate UI for Crackme
         '''
@@ -75,7 +75,7 @@ class Helper():
         dif_color = rating_color(int(difficulty))
         qul_color = rating_color(int(quality), True)
         # TODO: Emojis are not parsed as 1 character, duh, but messes up spacing
-        return color + f'#{crackme_id}{space(3 - len(str(crackme_id)))} {user}{space(longest_user+1 - len(user))}-> {name}{space(longest_name - len(name))} [{dif_color}{''.join(dif)}\033[0m] [{qul_color}{''.join(qul)}\033[0m]{color} {filehash}'.ljust(width) + '\033[0m'
+        return color + f'#{crackme_id}{space(3 - len(str(crackme_id)))} {user}{space(longest_user+1 - len(user))}-> {name}{space(longest_name - len(name))} [{dif_color}{''.join(dif)}\033[0m] [{qul_color}{''.join(qul)}\033[0m]{color} {downloads}{space(14 - len(str(downloads)))}{filehash}'.ljust(width) + '\033[0m'
     
     def login(use_cookie: bool, username: str, password: str, save: bool = False) -> int:
         '''
@@ -112,7 +112,7 @@ class Helper():
 
 
 # Globals
-__version__ = '0.3.0-alpha'
+__version__ = '0.4.0-alpha'
 requests = Session()
 requests.headers = {
     'User-Agent': f'COCLI/5.0 (X11; Python3 x86_64; rv:0.3.0) COCLI/{__version__}',
@@ -161,9 +161,9 @@ def handle_command(cmd: str, args: dict) -> int:
                 quality_max=int(args.get('quality_max', 6))
             )
             i = 0
-            print(f'{space(5 - len(str(i)))} Username{space(found['longest_user']+3 - len('Username'))} Name{space(found['longest_name']+1 - len('Name'))} Difficulty{space(12)}Quality{space(14)}Hash'.ljust(width))
+            print(f'{space(5 - len(str(i)))} Username{space(found['longest_user'] + 3 - len('Username'))} Name{space(found['longest_name'] + 1 - len('Name'))} Difficulty{space(12)}Quality{space(14)}Downloads{space(5)}Hash'.ljust(width))
             for x in found['found']:
-                print(Helper.crackme_display(i, x.user, x.name, x.difficulty, x.quality, x.filehash, found['longest_user'], found['longest_name']))
+                print(Helper.crackme_display(i, x.user, x.name, x.difficulty, x.quality, x.downloads, x.filehash, found['longest_user'], found['longest_name']))
                 i += 1
 
         case 'latest':
@@ -189,9 +189,9 @@ def handle_command(cmd: str, args: dict) -> int:
             else:
                 found = crackmes.get_latest(page)
             i = 0
-            print(f'{space(5 - len(str(i)))} Username{space(found['longest_user']+3 - len('Username'))} Name{space(found['longest_name']+1 - len('Name'))} Difficulty{space(12)}Quality{space(14)}Hash'.ljust(width))
+            print(f'{space(5 - len(str(i)))} Username{space(found['longest_user'] + 3 - len('Username'))} Name{space(found['longest_name'] + 1 - len('Name'))} Difficulty{space(12)}Quality{space(14)}Downloads{space(5)}Hash'.ljust(width))
             for x in found['found']:
-                print(Helper.crackme_display(i, x.user, x.name, x.difficulty, x.quality, x.filehash, found['longest_user'], found['longest_name']))
+                print(Helper.crackme_display(i, x.user, x.name, x.difficulty, x.quality, x.downloads, x.filehash, found['longest_user'], found['longest_name']))
                 i += 1
 
         case 'login':
