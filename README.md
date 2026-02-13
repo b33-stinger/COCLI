@@ -1,4 +1,4 @@
-## crackmes.one CLI 0.3.0-alpha
+## crackmes.one CLI 0.4.0-alpha
 
 A lightweight and user-friendly CLI client for crackmes.one. You can login, query crackmes and download them. Built for researchers and CTF players that want fast and easy access to crackmes.one
 
